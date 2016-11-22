@@ -1,0 +1,2 @@
+Fue necesario agregar librerias Cortex M0 y M4 sobre los includes que habia en gcc y demás
+Fue necesario mirar hoja de datos de la edu ciaa para ubicar bien el canal y el ADC correcto
