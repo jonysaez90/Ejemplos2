@@ -73,8 +73,53 @@
 #include "adc_dac_RTOS.h"
 //#include "chip.h"
 #include "sAPI.h"
+#include "sAPI_PeripheralMap.h"
+#include "sAPI_DigitalIO.h"
+#include "sAPI_AnalogIO.h"
+#include "sAPI_Board.h"
+#include "sAPI_DataTypes.h"
 
 uint16_t analogValue = 0;
+bool_t valor;
+
+int i=0;
+/*==================[internal functions definition]==========================*/
+char* ftoa(float f_number,char *buffer, uint8_t places)
+{
+    int pos = 0,
+    		ix,
+			dp,
+			num;
+
+
+    if ( f_number < 0 )
+    {
+        buffer[ pos++ ]='-';
+        f_number = - f_number;
+    }
+    dp = 0;
+
+    while ( f_number >= 10.0 )
+    {
+        f_number = f_number / 10.0;
+        dp++;
+    }
+  //  for ( ix = 1 ;ix < 8; ix++ )
+    for ( ix = 1 ;ix < places + 2; ix++ )
+    {
+            num = f_number;
+            f_number = f_number - num;
+            if ( num > 9 )
+                buffer[ pos++ ] = '#';
+            else
+                buffer[ pos++ ] = '0' + num;
+            if ( dp == 0 )
+            	buffer[ pos++ ] = '.';
+            f_number = f_number * 10.0;
+            dp--;
+    }
+    return buffer;
+}
 /*==================[macros and definitions]=================================*/
 
 /*==================[internal data declaration]==============================*/
@@ -89,7 +134,7 @@ uint16_t analogValue = 0;
 /*==================[external data definition]===============================*/
 
 /*==================[internal functions definition]==========================*/
-
+float medida=0;
 /*==================[external functions definition]==========================*/
 /** \brief Main function
  *
@@ -167,6 +212,13 @@ TASK(inicio)
 		      /* Inicializar UART_USB a 115200 baudios */
 		          uartConfig( UART_USB, 115200 );
 
+		          lcd_init_port();
+		          lcd_init();
+		          lcd_gotoxy(1,1);
+		          printf_lcd("ADC-DAC");
+		          lcd_gotoxy(1,2);
+		          digitalConfig(0,ENABLE_DIGITAL_IO);
+
 
 		          analogConfig( ENABLE_ANALOG_INPUTS );  /* ADC */
 		          analogConfig( ENABLE_ANALOG_OUTPUTS ); /* DAC */
@@ -184,29 +236,52 @@ TASK(inicio)
 
 
 TASK (salida_digital){
+	//float medida;
+    char string[4];
+
 	 WaitEvent(mostrar_medida);
 	 ClearEvent(mostrar_medida);
 	 GetResource(res_adc);
 
-	if(digitalRead(TEC2)==OFF){
-			 digitalWrite( LEDB, OFF ); //enciendo led azul
-			 /* Escribo la muestra en la Salida AnalogicaAO - DAC */
-			 	analogWrite( AO, analogValue );
-	}
-	ReleaseResource(res_adc);
-	    ActivateTask(medida_analogica);
-		TerminateTask();
-	//ChainTask(medida_analogica);
+	 digitalWrite(LED3,ON);
+	 while(1){
+	 if(digitalRead(TEC2) ==OFF){
 
+		        digitalWrite(LEDB,OFF); //apago led azul
+			 /* Escribo la muestra en la Salida AnalogicaAO - DAC */
+		        medida=(5.0*medida)/(1024);
+		        ftoa(medida,string,3);
+		        lcd_gotoxy(1,2);
+		        	printf_lcd("Salida:");
+		        	printf_lcd(string);
+		        	printf_lcd("V");
+
+			 	analogWrite( AO, analogValue );
+			 	ReleaseResource(res_adc);
+			    ActivateTask(medida_analogica);
+			 			TerminateTask();
+     }
+
+
+}
 }
 
 TASK(medida_analogica)
 {
-
+	float medida;
 		/* Leo la Entrada Analogica AI0 - ADC0 CH1 */
-
+   while(1){
 		         if(digitalRead(TEC1)==OFF){
-		        	 analogValue = analogRead( AI0 );
+		        	 lcd_init();
+		        	 lcd_gotoxy(1,1);
+		             printf_lcd("ADC-DAC");
+		        	 lcd_gotoxy(1,2);
+		        	 medida = analogRead( AI0 );
+		        	 analogValue=medida;
+		        	 lcd_gotoxy(1,2);
+		        	 	//printf_lcd("LED AZUL");
+		        	 	//printf_lcd(analogValue);
+		        	 	//printf_lcd(" V");
 		             digitalWrite( LEDB, ON ); //enciendo led azul
 		             ActivateTask(salida_digital);
 		             SetEvent(salida_digital,mostrar_medida);
@@ -214,6 +289,7 @@ TASK(medida_analogica)
 		             TerminateTask();
 		         }
 		         ChainTask(medida_analogica);
+   }
 }
 /** @} doxygen end group definition */
 /** @} doxygen end group definition */
